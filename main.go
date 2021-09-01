@@ -66,6 +66,21 @@ func sendDM(client *twitter.Client, tweet twitter.Tweet) {
 			},
 		},
 	})
+
+	client.DirectMessages.EventsNew(&twitter.DirectMessageEventsNewParams{
+		Event: &twitter.DirectMessageEvent{
+			Type: "message_create",
+			Message: &twitter.DirectMessageEventMessage{
+				SenderID: "1015612268384587776",
+				Target: &twitter.DirectMessageTarget{
+					RecipientID: "747198468465242112",
+				},
+				Data: &twitter.DirectMessageData{
+					Text: "A new opening? in my timeline? what are the odds! \n https://twitter.com/twitter/status/" + tweet.IDStr,
+				},
+			},
+		},
+	})
 }
 
 func lookupTweets() {
@@ -77,14 +92,14 @@ func lookupTweets() {
 		log.Println(err)
 	}
 
-	tweets, resp, err := client.Timelines.HomeTimeline(&twitter.HomeTimelineParams{
-		Count: 1000,
+	tweets, _, err := client.Timelines.HomeTimeline(&twitter.HomeTimelineParams{
+		Count: 500,
 	})
 
 	if err != nil {
 		log.Println(err)
 	}
-	log.Printf("%+v\n", resp)
+
 	for _, tweet := range filter(tweets) {
 		sendDM(client, tweet)
 	}
