@@ -4,10 +4,9 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
+	"github.com/joho/godotenv"
 )
 
 // other imports
@@ -27,6 +26,22 @@ func getClient(creds *Credentials) (*twitter.Client, error) {
 	client := twitter.NewClient(httpClient)
 
 	return client, nil
+}
+
+func loadEnv() (env Credentials){
+	err := godotenv.Load()
+	if err != nil {
+	  log.Fatal("Error loading .env file")
+	}  
+
+	env = Credentials{
+		AccessToken:       os.Getenv("ACCESS_TOKEN"),
+		AccessTokenSecret: os.Getenv("ACCESS_TOKEN_SECRET"),
+		ConsumerKey:       os.Getenv("CONSUMER_KEY"),
+		ConsumerSecret:    os.Getenv("CONSUMER_SECRET"),
+	}
+
+	return env
 }
 
 func laodAWSEnv() (env Credentials) {
@@ -73,7 +88,7 @@ func sendDM(client *twitter.Client, tweet twitter.Tweet) {
 			Message: &twitter.DirectMessageEventMessage{
 				SenderID: "1015612268384587776",
 				Target: &twitter.DirectMessageTarget{
-					RecipientID: "747198468465242112",
+					RecipientID: "1325026936037339137",
 				},
 				Data: &twitter.DirectMessageData{
 					Text: "A new opening? in my timeline? what are the odds! \n https://twitter.com/twitter/status/" + tweet.IDStr,
@@ -84,27 +99,73 @@ func sendDM(client *twitter.Client, tweet twitter.Tweet) {
 }
 
 func lookupTweets() {
-	creds := laodAWSEnv()
-
+	creds := loadEnv()
+ 
 	client, err := getClient(&creds)
+
 	if err != nil {
 		log.Println("Error getting Twitter Client")
 		log.Println(err)
 	}
+	
+	cursor := int64(-1) 
 
-	tweets, _, err := client.Timelines.HomeTimeline(&twitter.HomeTimelineParams{
-		Count: 500,
-	})
+	for ok := true; ok; ok = (cursor != 0) {
+		friends,_,_ := client.Friends.List(&twitter.FriendListParams{
+			UserID: 1325026936037339137,
+			Cursor: cursor,
+		})
 
-	if err != nil {
-		log.Println(err)
+		for _,user := range friends.Users {
+			tweets, _, _ := client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+				UserID: user.ID,    
+			})
+
+			for _, tweet := range filter(tweets) {
+				sendDM(client, tweet)
+			}
+		}
+
+		cursor = friends.PreviousCursor
 	}
 
-	for _, tweet := range filter(tweets) {
-		sendDM(client, tweet)
-	}
+
+
+
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+
+	// tweets, _, err := client.Timelines.UserTimeline(&twitter.UserTimelineParams{
+	// 	UserID: 1325026936037339137,    
+	// })
+	
+
+
+
+	//log.Println(tweets)
+
+
+	//log.Println(friends)
+
+	// for _, tweet := range filter(tweets) {
+	// 	sendDM(client, tweet)
+	// }
+
+	// tweets, _, err := client.Timelines.HomeTimeline(&twitter.HomeTimelineParams{
+	// 	Count: 500,
+	// })
+
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+	// for _, tweet := range filter(tweets) {
+	// 	sendDM(client, tweet)
+	// }
 }
 
 func main() {
-	lambda.Start(lookupTweets)
+	lookupTweets()
 }
